@@ -9,22 +9,15 @@ import ejs from 'ejs';
 const RESET_TTL = 1000 * 60 * 60;         // 1h
 const INVITE_TTL = 1000 * 60 * 60 * 24 * 7; // 7d
 
-// Función para sanitizar datos de entrada
+// Función para sanitizar datos de entrada - WHITELIST approach
 function sanitizeInput(input: string): string {
   if (!input) return '';
   
-  // Remover caracteres peligrosos para templates
+  // Solo permitir letras, números, espacios y algunos caracteres seguros
   return input
-    .replace(/<%/g, '')  // Remover inicio de tags EJS
-    .replace(/%>/g, '')  // Remover fin de tags EJS
-    .replace(/<%=/g, '') // Remover tags de salida EJS
-    .replace(/<%-/g, '') // Remover tags de salida sin escape
-    .replace(/<%#/g, '') // Remover comentarios EJS
-    .replace(/<%!/g, '') // Remover comentarios EJS
-    .replace(/<%/g, '')  // Remover cualquier tag EJS restante
-    .replace(/<%>/g, '') // Remover cualquier tag EJS restante
+    .replace(/[^a-zA-Z0-9\s\-\.]/g, '') // Solo alfanuméricos, espacios, guiones y puntos
     .trim()
-    .substring(0, 100); // Limitar longitud
+    .substring(0, 50); // Limitar longitud
 }
 
 class AuthService {
@@ -81,8 +74,8 @@ class AuthService {
       lastName: sanitizedUser.last_name,
       link: link
     }, {
-      escape: true,    //
-      strict: true     
+      escape: true,    // Escapa automáticamente HTML
+      strict: true     // Modo estricto
     });
     
     await transporter.sendMail({
