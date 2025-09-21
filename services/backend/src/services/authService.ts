@@ -9,24 +9,51 @@ import ejs from 'ejs';
 const RESET_TTL = 1000 * 60 * 60;         // 1h
 const INVITE_TTL = 1000 * 60 * 60 * 24 * 7; // 7d
 
+// Función para sanitizar datos de entrada
+function sanitizeInput(input: string): string {
+  if (!input) return '';
+  
+  // Remover caracteres peligrosos para templates
+  return input
+    .replace(/<%/g, '')  // Remover inicio de tags EJS
+    .replace(/%>/g, '')  // Remover fin de tags EJS
+    .replace(/<%=/g, '') // Remover tags de salida EJS
+    .replace(/<%-/g, '') // Remover tags de salida sin escape
+    .replace(/<%#/g, '') // Remover comentarios EJS
+    .replace(/<%!/g, '') // Remover comentarios EJS
+    .replace(/<%/g, '')  // Remover cualquier tag EJS restante
+    .replace(/<%>/g, '') // Remover cualquier tag EJS restante
+    .trim()
+    .substring(0, 100); // Limitar longitud
+}
+
 class AuthService {
 
   static async createUser(user: User) {
+    // Sanitizar datos de entrada
+    const sanitizedUser = {
+      ...user,
+      first_name: sanitizeInput(user.first_name),
+      last_name: sanitizeInput(user.last_name),
+      username: sanitizeInput(user.username)
+    };
+
     const existing = await db<UserRow>('users')
-      .where({ username: user.username })
-      .orWhere({ email: user.email })
+      .where({ username: sanitizedUser.username })
+      .orWhere({ email: sanitizedUser.email })
       .first();
     if (existing) throw new Error('User already exists with that username or email');
+    
     // create invite token
     const invite_token = crypto.randomBytes(6).toString('hex');
     const invite_token_expires = new Date(Date.now() + INVITE_TTL);
     await db<UserRow>('users')
       .insert({
-        username: user.username,
-        password: user.password,
-        email: user.email,
-        first_name: user.first_name,
-        last_name:  user.last_name,
+        username: sanitizedUser.username,
+        password: sanitizedUser.password,
+        email: sanitizedUser.email,
+        first_name: sanitizedUser.first_name,
+        last_name: sanitizedUser.last_name,
         invite_token,
         invite_token_expires,
         activated: false
@@ -40,20 +67,27 @@ class AuthService {
         pass: process.env.SMTP_PASS
       }
     });
-    const link = `${process.env.FRONTEND_URL}/activate-user?token=${invite_token}&username=${user.username}`;
+    const link = `${process.env.FRONTEND_URL}/activate-user?token=${invite_token}&username=${sanitizedUser.username}`;
    
     const template = `
       <html>
         <body>
-          <h1>Hello ${user.first_name} ${user.last_name}</h1>
-          <p>Click <a href="${ link }">here</a> to activate your account.</p>
+          <h1>Hello <%= firstName %> <%= lastName %></h1>
+          <p>Click <a href="<%= link %>">here</a> to activate your account.</p>
         </body>
       </html>`;
-    const htmlBody = ejs.render(template);
+    const htmlBody = ejs.render(template, {
+      firstName: sanitizedUser.first_name,
+      lastName: sanitizedUser.last_name,
+      link: link
+    }, {
+      escape: true,    //
+      strict: true     
+    });
     
     await transporter.sendMail({
       from: "info@example.com",
-      to: user.email,
+      to: sanitizedUser.email,
       subject: 'Activate your account',
       html: htmlBody
     });
@@ -114,10 +148,23 @@ class AuthService {
     });
 
     const link = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    const resetTemplate = `
+      <html>
+        <body>
+          <p>Click <a href="<%= resetLink %>">here</a> to reset your password.</p>
+        </body>
+      </html>`;
+    const resetHtml = ejs.render(resetTemplate, {
+      resetLink: link
+    }, {
+      escape: true,
+      strict: true
+    });
+    
     await transporter.sendMail({
       to: user.email,
       subject: 'Your password reset link',
-      html: `Click <a href="${link}">here</a> to reset your password.`
+      html: resetHtml
     });
   }
 
