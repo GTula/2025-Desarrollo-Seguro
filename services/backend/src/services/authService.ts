@@ -73,9 +73,6 @@ class AuthService {
       firstName: sanitizedUser.first_name,
       lastName: sanitizedUser.last_name,
       link: link
-    }, {
-      escape: true,    // Escapa automáticamente HTML
-      strict: true     // Modo estricto
     });
     
     await transporter.sendMail({
@@ -149,9 +146,6 @@ class AuthService {
       </html>`;
     const resetHtml = ejs.render(resetTemplate, {
       resetLink: link
-    }, {
-      escape: true,
-      strict: true
     });
     
     await transporter.sendMail({
