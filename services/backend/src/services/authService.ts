@@ -9,31 +9,33 @@ import ejs from 'ejs';
 const RESET_TTL = 1000 * 60 * 60;         // 1h
 const INVITE_TTL = 1000 * 60 * 60 * 24 * 7; // 7d
 
-// Función para sanitizar datos de entrada - WHITELIST approach
-function sanitizeInput(input: string): string {
-  if (!input) return '';
+// función para validar los datos
+function validateInput(input: string, fieldName: string): void {
+  if (!input) return;
   
-  // Solo permitir letras, números, espacios y algunos caracteres seguros
-  return input
-    .replace(/[^a-zA-Z0-9\s\-\.]/g, '') // Solo alfanuméricos, espacios, guiones y puntos
-    .trim()
-    .substring(0, 50); // Limitar longitud
+  // verificación de caracteres peligrosos
+  const dangerousChars = /[<>%{}`$()\[\]'";\\\/&]/g;
+  if (dangerousChars.test(input)) {
+    throw new Error(`Invalid characters detected in ${fieldName}. Only letters, numbers, spaces, hyphens and dots are allowed.`);
+  }
+  
+  // verificación de longitud
+  if (input.length > 50) {
+    throw new Error(`${fieldName} is too long. Maximum 50 characters allowed.`);
+  }
 }
 
 class AuthService {
 
   static async createUser(user: User) {
-    // Sanitizar datos de entrada
-    const sanitizedUser = {
-      ...user,
-      first_name: sanitizeInput(user.first_name),
-      last_name: sanitizeInput(user.last_name),
-      username: sanitizeInput(user.username)
-    };
+    // validar los datos de entrada utilizando la función
+    validateInput(user.first_name, 'first_name');
+    validateInput(user.last_name, 'last_name');
+    validateInput(user.username, 'username');
 
     const existing = await db<UserRow>('users')
-      .where({ username: sanitizedUser.username })
-      .orWhere({ email: sanitizedUser.email })
+      .where({ username: user.username })
+      .orWhere({ email: user.email })
       .first();
     if (existing) throw new Error('User already exists with that username or email');
     
@@ -42,11 +44,11 @@ class AuthService {
     const invite_token_expires = new Date(Date.now() + INVITE_TTL);
     await db<UserRow>('users')
       .insert({
-        username: sanitizedUser.username,
-        password: sanitizedUser.password,
-        email: sanitizedUser.email,
-        first_name: sanitizedUser.first_name,
-        last_name: sanitizedUser.last_name,
+        username: user.username,
+        password: user.password,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
         invite_token,
         invite_token_expires,
         activated: false
@@ -60,7 +62,7 @@ class AuthService {
         pass: process.env.SMTP_PASS
       }
     });
-    const link = `${process.env.FRONTEND_URL}/activate-user?token=${invite_token}&username=${sanitizedUser.username}`;
+    const link = `${process.env.FRONTEND_URL}/activate-user?token=${invite_token}&username=${user.username}`;
    
     const template = `
       <html>
@@ -70,14 +72,14 @@ class AuthService {
         </body>
       </html>`;
     const htmlBody = ejs.render(template, {
-      firstName: sanitizedUser.first_name,
-      lastName: sanitizedUser.last_name,
+      firstName: user.first_name,
+      lastName: user.last_name,
       link: link
     });
     
     await transporter.sendMail({
       from: "info@example.com",
-      to: sanitizedUser.email,
+      to: user.email,
       subject: 'Activate your account',
       html: htmlBody
     });
