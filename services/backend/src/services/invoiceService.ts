@@ -16,7 +16,17 @@ interface InvoiceRow {
 class InvoiceService {
   static async list( userId: string, status?: string, operator?: string): Promise<Invoice[]> {
     let q = db<InvoiceRow>('invoices').where({ userId: userId });
-    if (status) q = q.andWhereRaw(" status "+ operator + " '"+ status +"'");
+    // if (status) q = q.andWhereRaw(" status "+ operator + " '"+ status +"'"); // posible sql injection!!!
+    
+    if (status) {
+      const allowedOps: Set<string> = new Set(['=', '<', '>', '<=', '>=']); 
+      if (!operator || !allowedOps.has(operator)) {
+        throw new Error('Operador no permitido');
+      }
+      
+      q = q.andWhere('status', operator as any, status);
+    }
+
     const rows = await q.select();
     const invoices = rows.map(row => ({
       id: row.id,
