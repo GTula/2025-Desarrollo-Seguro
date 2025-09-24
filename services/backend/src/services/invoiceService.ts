@@ -62,27 +62,21 @@ class InvoiceService {
   }
 
 
-  static async getReceipt(
-    invoiceId: string,
-    pdfName: string
-  ) {
-    // check if the invoice exists
+  static async getReceipt(invoiceId: string, pdfName: string) {
     const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId }).first();
-    if (!invoice) {
-      throw new Error('Invoice not found');
+    if (!invoice) throw new Error('Invoice not found');
+
+    const baseDir = '/invoices';
+    const safePath = path.resolve(baseDir, pdfName);
+
+    if (!safePath.startsWith(path.resolve(baseDir))) {
+      throw new Error('Acceso no autorizado al sistema de archivos');
     }
-    try {
-      const filePath = `/invoices/${pdfName}`;
-      const content = await fs.readFile(filePath, 'utf-8');
-      return content;
-    } catch (error) {
-      // send the error to the standard output
-      console.error('Error reading receipt file:', error);
-      throw new Error('Receipt not found');
 
-    } 
+    const content = await fs.readFile(safePath, 'utf-8');
+    return content;
+  }
 
-  };
 
 };
 
