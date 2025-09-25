@@ -63,29 +63,39 @@ class InvoiceService {
       .where({ id: invoiceId, userId })
       .update({ status: 'paid' });  
     };
-  static async  getInvoice( invoiceId:string): Promise<Invoice> {
-    const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId }).first();
-    if (!invoice) {
-      throw new Error('Invoice not found');
-    }
-    return invoice as Invoice;
+  static async getInvoice(invoiceId: string, userId: string): Promise<Invoice> {
+  const invoice = await db<InvoiceRow>('invoices')
+    .where({ id: invoiceId, userId }) // ahora filtra por el dueño
+    .first();
+
+  if (!invoice) {
+    throw new Error('Invoice not found or access denied');
   }
+
+  return invoice as Invoice;
+}
 
 
   static async getReceipt(invoiceId: string, pdfName: string) {
-    const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId }).first();
-    if (!invoice) throw new Error('Invoice not found');
+  const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId }).first();
+  if (!invoice) throw new Error('Invoice not found');
 
-    const baseDir = '/invoices';
-    const safePath = path.resolve(baseDir, pdfName);
+  const baseDir = '/invoices';
+  const safePath = path.resolve(baseDir, pdfName);
 
-    if (!safePath.startsWith(path.resolve(baseDir))) {
-      throw new Error('Acceso no autorizado al sistema de archivos');
-    }
+  if (!safePath.startsWith(path.resolve(baseDir))) {
+    throw new Error('Acceso no autorizado al sistema de archivos');
+  }
 
+  try {
     const content = await fs.readFile(safePath, 'utf-8');
     return content;
+  } catch (error) {
+    console.error('Error reading receipt file:', error);
+    throw new Error('Receipt not found');
   }
+}
+
 
 
 };

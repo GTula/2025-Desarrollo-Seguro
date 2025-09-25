@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../api.js';
 
 export default function Login() {
-  const [creds, setCreds] = useState({ email: '', password: '' });
+  const [creds, setCreds] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
@@ -18,7 +18,13 @@ export default function Login() {
       localStorage.setItem('token', res.data.token);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      // soportar distintas formas de respuesta: { error: '...' } o { message: '...' }
+      setError(
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        err.message ||
+        'Login failed'
+      );
     }
   };
 
@@ -34,15 +40,16 @@ export default function Login() {
         <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm/6 font-medium text-gray-900">
+              <label htmlFor="username" className="block text-sm/6 font-medium text-gray-900">
                 Username
               </label>
               <div className="mt-2">
                 <input
-                  type="email"
-                  name="email"
-                  placeholder="Email"
-                  value={creds.email}
+                  id="username"
+                  type='text'
+                  name="username"
+                  placeholder="Username"
+                  value={creds.username}
                   onChange={handleChange}
                   required
                   className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
@@ -58,6 +65,7 @@ export default function Login() {
               </div>
               <div className="mt-2">
                 <input
+                  id="password"
                   type="password"
                   name="password"
                   placeholder="Password"
@@ -78,20 +86,21 @@ export default function Login() {
               </button>
             </div>
           </form>
-        <div className="flex items-center justify-between">
+
+          <div className="flex items-center justify-between">
             {error && <p className="text-red-500 mt-4">{error}</p>}
-        </div>
-          
-      <div className="flex items-center justify-between">
-        <Link to="/forgot-password" className="block text-blue-600 mt-4 hover:underline">
-          Forgot my password?
-        </Link>
-      </div>
-      <div className="flex items-center justify-between">
-        <Link to="/register" className="block text-blue-600 mt-2 hover:underline">
-          Don’t have an account? Register
-        </Link>
-      </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Link to="/forgot-password" className="block text-blue-600 mt-4 hover:underline">
+              Forgot my password?
+            </Link>
+          </div>
+          <div className="flex items-center justify-between">
+            <Link to="/register" className="block text-blue-600 mt-2 hover:underline">
+              Don’t have an account? Register
+            </Link>
+          </div>
         </div>
       </div>
     </>
