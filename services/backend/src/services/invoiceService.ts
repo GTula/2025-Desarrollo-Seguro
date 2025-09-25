@@ -16,7 +16,17 @@ interface InvoiceRow {
 class InvoiceService {
   static async list( userId: string, status?: string, operator?: string): Promise<Invoice[]> {
     let q = db<InvoiceRow>('invoices').where({ userId: userId });
-    if (status) q = q.andWhereRaw(" status "+ operator + " '"+ status +"'");
+    // if (status) q = q.andWhereRaw(" status "+ operator + " '"+ status +"'"); // posible sql injection!!!
+    
+    if (status) {
+      const allowedOps: Set<string> = new Set(['=', '<', '>', '<=', '>=']); 
+      if (!operator || !allowedOps.has(operator)) {
+        throw new Error('Operador no permitido');
+      }
+      
+      q = q.andWhere('status', operator as any, status);
+    }
+
     const rows = await q.select();
     const invoices = rows.map(row => ({
       id: row.id,
@@ -66,27 +76,27 @@ class InvoiceService {
 }
 
 
-  static async getReceipt(
-    invoiceId: string,
-    pdfName: string
-  ) {
-    // check if the invoice exists
-    const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId }).first();
-    if (!invoice) {
-      throw new Error('Invoice not found');
-    }
-    try {
-      const filePath = `/invoSices/${pdfName}`;
-      const content = await fs.readFile(filePath, 'utf-8');
-      return content;
-    } catch (error) {
-      // send the error to the standard output
-      console.error('Error reading receipt file:', error);
-      throw new Error('Receipt not found');
+  static async getReceipt(invoiceId: string, pdfName: string) {
+  const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId }).first();
+  if (!invoice) throw new Error('Invoice not found');
 
-    } 
+  const baseDir = '/invoices';
+  const safePath = path.resolve(baseDir, pdfName);
 
-  };
+  if (!safePath.startsWith(path.resolve(baseDir))) {
+    throw new Error('Acceso no autorizado al sistema de archivos');
+  }
+
+  try {
+    const content = await fs.readFile(safePath, 'utf-8');
+    return content;
+  } catch (error) {
+    console.error('Error reading receipt file:', error);
+    throw new Error('Receipt not found');
+  }
+}
+
+
 
 };
 
