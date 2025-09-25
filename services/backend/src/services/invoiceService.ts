@@ -13,6 +13,13 @@ interface InvoiceRow {
   status: string;
 }
 
+// registry mínimo — pon acá los proveedores reales que uses en el práctico
+const PAYMENT_PROVIDERS: Record<string, { url: string }> = {
+  stripe: { url: 'https://payments.stripe.example' },
+  acme:   { url: 'https://payments.acme-example.com' },
+  // si en el práctico sólo necesitas uno, pon sólo ese
+};
+
 class InvoiceService {
   static async list( userId: string, status?: string, operator?: string): Promise<Invoice[]> {
     let q = db<InvoiceRow>('invoices').where({ userId: userId });
@@ -38,7 +45,7 @@ class InvoiceService {
     return invoices;
   }
 
-  static async setPaymentCard(
+    static async setPaymentCard(
     userId: string,
     invoiceId: string,
     paymentBrand: string,
@@ -46,23 +53,34 @@ class InvoiceService {
     ccv: string,
     expirationDate: string
   ) {
-    // use axios to call http://paymentBrand/payments as a POST request
-    // with the body containing ccNumber, ccv, expirationDate
-    // and handle the response accordingly
-    const paymentResponse = await axios.post(`http://${paymentBrand}/payments`, {
-      ccNumber,
-      ccv,
-      expirationDate
-    });
-    if (paymentResponse.status !== 200) {
+    const provider = PAYMENT_PROVIDERS[paymentBrand];
+    if (!provider) {
+      throw new Error('Unknown payment provider');
+    }
+
+    const url = `${provider.url}/payments`;
+
+    const axiosConfig = {
+      timeout: 5000,
+      maxRedirects: 0,
+      validateStatus: (s: number) => s >= 200 && s < 300,
+    };
+
+    const paymentResponse = await axios.post(
+      url,
+      { ccNumber, ccv, expirationDate },
+      axiosConfig
+    );
+
+    if (!paymentResponse || paymentResponse.status !== 200) {
       throw new Error('Payment failed');
     }
 
-    // Update the invoice status in the database
     await db('invoices')
       .where({ id: invoiceId, userId })
-      .update({ status: 'paid' });  
-    };
+      .update({ status: 'paid' });
+  }
+
   static async getInvoice(invoiceId: string, userId: string): Promise<Invoice> {
   const invoice = await db<InvoiceRow>('invoices')
     .where({ id: invoiceId, userId }) // ahora filtra por el dueño
